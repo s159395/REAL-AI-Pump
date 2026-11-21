@@ -1,0 +1,91 @@
+# Topstep 50K Combine bot configuration.
+# Copy to config.yaml and edit. Anything you leave out uses the built-in default
+# (see topstep_bot/config.py). Secrets go in .env, never in this file.
+
+instrument:
+  # MNQ (Micro Nasdaq, $2/pt) or MES (Micro S&P, $5/pt) are recommended for a 50K:
+  # micros let the bot size each trade to an exact dollar risk.
+  symbol: MNQ
+  contract_id: null        # null = auto-pick the active front month
+
+# --- Topstep account rules -------------------------------------------------
+# VERIFY these on your TopstepX account's rules page. Topstep updates them.
+combine:
+  starting_balance: 50000
+  profit_target: 3000
+  max_loss_limit: 2000
+  mll_trailing: eod          # trails the end-of-day balance high ("intraday" also supported)
+  mll_stops_at_start: true   # MLL stops trailing once it reaches $50,000
+  daily_loss_limit: null     # TopstepX: only if you added the optional DLL at checkout (then: 1000)
+  max_minis: 5               # 5 minis = 50 micros
+  consistency_pct: 0.50      # best day must be < 50% of total profit
+  min_trading_days: 1
+  # If you start the bot on an account that has already traded, set these from
+  # your TopstepX dashboard so the bot knows where your MLL really is:
+  # resume_mll: 48650
+  # resume_best_day: 640
+
+# --- The bot's own risk rules (stricter than Topstep's) ----------------------
+risk:
+  risk_per_trade: 200        # $ lost on a full stop-out
+  max_daily_loss: 450        # stop for the day at -$450 (~4 bad days before the MLL)
+  daily_profit_cap: 900      # stop for the day at +$900 (keeps the 50% consistency rule safe)
+  max_trades_per_day: 3
+  max_consecutive_losses: 2
+  max_contracts: 15
+  mll_buffer: 150            # a stop-out must never land within $150 of the MLL
+  stop_after_pass: true      # stop trading once the target + consistency are met
+  drawdown_risk_scale: 0.5   # trade half size while > $500 below your best EOD balance
+  drawdown_scale_threshold: 500
+  scale_down_near_target: true  # risk only what is needed to finish the target
+
+session:                     # all times are US Central (Chicago)
+  entry_windows: ["08:35-11:00", "13:00-14:30"]
+  flatten_time: "15:00"      # Topstep requires flat by 3:10 PM CT
+  blackouts:
+    - {time: "07:25-07:40", label: "8:30 ET data"}
+    # Add high-impact events. "flatten: true" also closes any open trade:
+    # - {date: "2026-12-16", time: "12:55-13:45", flatten: true, label: "FOMC"}
+    # - {date: "2026-12-10", time: "07:20-07:45", flatten: true, label: "CPI"}
+
+strategies:
+  enabled: [orb, vwap_pullback]    # priority order; they share one position
+  orb:
+    timeframe: 5
+    or_minutes: 15
+    entry_end: "10:30"
+    stop_mode: mid           # mid = OR midpoint, opposite = far side of the range
+    target_r: 2.0
+    min_stop_points: 8
+    max_stop_points: 60      # MNQ points; skip days with a huge opening range
+    vwap_filter: true
+    ema_trend_filter: true
+    max_entries: 1
+  vwap_pullback:
+    timeframe: 5
+    fast_ema: 9
+    slow_ema: 21
+    target_r: 1.8
+    min_stop_points: 8
+    max_stop_points: 50
+    max_entries: 2
+    start: "09:00"
+    end: "14:00"
+
+management:
+  breakeven_at_r: 1.0        # move stop to entry +2 ticks once the trade is +1R
+  breakeven_offset_ticks: 2
+  time_stop_minutes: 120
+
+backtest:
+  commission_per_contract: 0.74   # round-turn fees per contract; check your TopstepX fee schedule
+  slippage_ticks: 1
+  combine_max_days: 30
+
+live:
+  account_id: null           # run `python -m topstep_bot accounts` to find it
+  account_name: null
+  poll_seconds: 5
+  bracket_mode: native       # native = server-side OCO brackets (recommended)
+  bracket_tick_sign: auto
+  warmup_days: 4

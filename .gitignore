@@ -1,0 +1,15 @@
+# secrets and local runtime files
+.env
+config.yaml
+state/
+logs/
+results/
+data/*.csv
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
